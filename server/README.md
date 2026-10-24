@@ -1,0 +1,51 @@
+# Progress sync on this laptop
+
+The user service `immich-sort-sync` listens on port 2284. It verifies each request
+against the local Immich `/api/users/me` endpoint using the supplied API key.
+It stores no API keys and cannot change photos. Each Immich user has separate
+progress. The Android app uses the same server hostname with port 2284.
+
+Completed decisions merge by photo ID and decision timestamp. Pending swipes
+are local only. Manual completion records the currently loaded photo IDs, so new
+uploads are still unsorted. Existing phone progress uploads after installing the
+new APK without clearing app data. Sync runs while the app is open, on changes,
+and every 30 seconds; Settings also has Sync progress now. Failed sync preserves
+local progress for retry.
+
+Service: `systemctl --user status immich-sort-sync`
+Data: `/home/thijs/Projects/immich-sort/server/data/progress.sqlite3`
+Health: `http://localhost:2284/health`
+
+The service starts with this user's login. This laptop currently has user
+lingering disabled, so it is not guaranteed to run while the user is logged out.
+Use on the trusted home network, matching the existing HTTP Immich setup.
+No public router port forwarding is configured. For HTTPS/reverse-proxy setups,
+port 2284 also needs matching HTTPS configuration.
+
+Back up progress along with the photos and Immich database. For a consistent
+SQLite backup while running, use Python sqlite3.Connection.backup; alternatively
+stop this service briefly and copy the database, then start it. The second laptop
+backup has not been configured by this change.
+
+## Photo-copy overview
+
+`GET /backup-status` verifies the caller with Immich using the same API key as
+progress sync. It returns aggregate original-media counts and bytes across all
+accounts, not filenames. `backup_status.py` scans `upload/` and `library/` beneath
+`PHOTO_LIBRARY_ROOT` (default `/home/thijs/immich-library`), excluding generated
+media and sidecars. Measurements are cached for 60 seconds. The app polls every
+30 seconds while foregrounded and marks measurements older than two minutes stale.
+
+For the second laptop it uses the dedicated `~/.ssh/immich_monitor` key with
+strict host-key checking and batch mode, requesting `photo-status` from
+`thijs@192.168.68.117`. The backup laptop must restrict that key to its installed
+read-only `monitor-status.py` command. Its mirror root is
+`/home/thijs/Immich-Backup/mirror/`. A missing login or failed scan produces an
+unavailable status, retaining the original timestamp of any prior measurement.
+`PHOTO_MONITOR_KEY` overrides the key location. An optional local JSON snapshot
+at `PHOTO_BACKUP_STATUS` (default `server/data/backup-status.json`) can supply
+`files`, `bytes`, and `measuredAt` (Unix milliseconds). Never refresh the snapshot
+timestamp unless the backup has actually been measured.
+
+The dashboard does not configure backup jobs, verify matching content, or claim
+that 15-minute sync and 30-day recovery are active. These remain setup work.

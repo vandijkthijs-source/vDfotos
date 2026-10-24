@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "vDfotos",
+    "slug": "immich-sort",
+    "version": "1.0.2",
+    "scheme": "immichsort",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "android": {
+      "package": "nl.vandijk.immichsort",
+      "allowBackup": false,
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.INTERNET"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d1218"
+      },
+      "versionCode": 3
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-video",
+      "./plugins/withLocalNetwork"
+    ],
+    "web": {
+      "output": "single",
+      "name": "vDfotos"
+    },
+    "icon": "./assets/icon.png"
+  }
+}

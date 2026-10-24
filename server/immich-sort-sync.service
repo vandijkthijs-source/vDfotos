@@ -1,0 +1,17 @@
+[Unit]
+Description=Immich Sort progress sync
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/thijs/Projects/immich-sort/server/sync_server.py
+Environment=IMMICH_URL=http://127.0.0.1:2283
+Environment=SORT_DB=/home/thijs/Projects/immich-sort/server/data/progress.sqlite3
+Environment=SORT_PORT=2284
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
