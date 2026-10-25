@@ -297,7 +297,7 @@ export default function Home() {
       <View style={s.row}><View style={{ flex: 1 }}><Button title="Mark sorted" busy={busy} disabled={!selectedWeeks.length} onPress={() => setSelectedSorted(true)} /></View><View style={{ flex: 1 }}><Button title="Mark not sorted" tone="quiet" disabled={busy || !selectedWeeks.length} onPress={() => setSelectedSorted(false)} /></View></View>
     </View>}
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.border, backgroundColor: c.bg, paddingVertical: 8 }}>
-      {([{ page: 'photos', label: 'Photos', icon: 'images-outline' }, { page: 'weeks', label: 'Sort', icon: 'swap-horizontal-outline' }, { page: 'albums', label: 'Albums', icon: 'albums-outline' }, { page: 'search', label: 'Search', icon: 'search-outline' }] as const).map(tab => {
+      {([{ page: 'photos', label: 'Photos', icon: 'images-outline' }, { page: 'albums', label: 'Albums', icon: 'albums-outline' }, { page: 'search', label: 'Search', icon: 'search-outline' }, { page: 'weeks', label: 'Sort', icon: 'swap-horizontal-outline' }] as const).map(tab => {
         const active = page === tab.page || (tab.page === 'weeks' && page === 'sort');
         return <Pressable key={tab.page} accessibilityRole="tab" accessibilityLabel={tab.label} accessibilityState={{ selected: active }} disabled={busy || albumBusy} onPress={() => { setPage(tab.page); setSelectionMode(false); setSelectedWeeks([]); setError(''); setStatus(''); }} style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 6 }}><Icon name={tab.icon} color={active ? c.text : c.muted} /><Text style={[s.small, { color: active ? c.text : c.muted }]}>{tab.label}</Text></Pressable>;
       })}
