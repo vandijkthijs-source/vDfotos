@@ -4,6 +4,7 @@ export type BackupStatus = {
   primary: Measurement | null;
   backup: Measurement | null;
   library: { active: number | null; trashed: number | null };
+  backupMissingSince: number | null;
   checkedAt: number;
 };
 export function validMeasurement(value: unknown): value is Measurement {
@@ -24,10 +25,12 @@ export async function fetchBackupStatus(connection: Connection, signal: AbortSig
   const result = await response.json();
   if (!result || !('primary' in result) || !('backup' in result)) throw new Error('Invalid status');
   const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const missingSince = result.backupMissingSince;
   return {
     primary: validMeasurement(result.primary) ? result.primary : null,
     backup: validMeasurement(result.backup) ? result.backup : null,
     library: { active: count(result.library?.active), trashed: count(result.library?.trashed) },
+    backupMissingSince: typeof missingSince === 'number' && Number.isFinite(missingSince) && missingSince >= 0 && missingSince <= Date.now() + 60000 ? missingSince : null,
     checkedAt: Date.now(),
   };
 }

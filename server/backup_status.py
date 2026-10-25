@@ -10,6 +10,55 @@ MEDIA = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.avif', '.
 _lock = threading.Lock()
 _cached = None
 _cached_at = 0
+_gap_state_path = Path(os.environ.get('PHOTO_BACKUP_GAP_STATE', str(Path(__file__).with_name('data') / 'backup-gap.json')))
+_gap_since = None
+_gap_loaded = False
+
+
+def load_gap_since():
+    global _gap_since, _gap_loaded
+    if _gap_loaded:
+        return _gap_since
+    try:
+        value = json.loads(_gap_state_path.read_text()).get('backupMissingSince')
+        if type(value) in (int, float) and 0 <= value <= time.time() * 1000 + 60000:
+            _gap_since = value
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    _gap_loaded = True
+    return _gap_since
+
+
+def save_gap_since(value):
+    global _gap_since, _gap_loaded
+    _gap_since = value
+    _gap_loaded = True
+    try:
+        _gap_state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = _gap_state_path.with_suffix(_gap_state_path.suffix + '.tmp')
+        temporary.write_text(json.dumps({'backupMissingSince': value}))
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, _gap_state_path)
+    except OSError:
+        pass
+
+
+def backup_missing_since(primary, backup):
+    """Persist when a measurable difference between the two copies began."""
+    since = load_gap_since()
+    if primary is None or backup is None:
+        return since
+    now = time.time() * 1000
+    if now - primary['measuredAt'] >= 120000 or now - backup['measuredAt'] >= 120000:
+        return since
+    differs = primary['files'] != backup['files'] or primary['bytes'] != backup['bytes']
+    if differs and since is None:
+        since = time.time() * 1000
+        save_gap_since(since)
+    elif not differs and since is not None:
+        since = None
+        save_gap_since(None)
+    return since
 
 
 def measure(root):
@@ -77,7 +126,12 @@ def status():
         backup = remote_backup() or read_backup(os.environ.get('PHOTO_BACKUP_STATUS', str(Path(__file__).with_name('data') / 'backup-status.json')))
         if backup is None and _cached is not None:
             backup = _cached['backup']
-        _cached = {'primary': primary, 'backup': backup, 'checkedAt': time.time() * 1000}
+        _cached = {
+            'primary': primary,
+            'backup': backup,
+            'backupMissingSince': backup_missing_since(primary, backup),
+            'checkedAt': time.time() * 1000,
+        }
         _cached_at = time.monotonic()
         return _cached
 

@@ -37,6 +37,9 @@ totals from Immich. The API key needs `asset.statistics` for those two totals.
 `PHOTO_LIBRARY_ROOT` (default `/home/thijs/immich-library`), excluding generated
 media and sidecars. Measurements are cached for 60 seconds. The app polls every
 30 seconds while foregrounded and marks measurements older than two minutes stale.
+The service remembers when measured file counts or byte totals first differ in
+`server/data/backup-gap.json`. The app keeps the backup bar amber for 30 days,
+then turns it red; the server bar is measured independently.
 
 For the second laptop it uses the dedicated `~/.ssh/immich_monitor` key with
 strict host-key checking and batch mode, requesting `photo-status` from
