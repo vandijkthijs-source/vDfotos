@@ -235,7 +235,7 @@ export default function Home() {
     <Button title="Connect my library" icon="arrow-forward" onPress={connect} busy={busy} />
     <Button title="Try a sample week" tone="quiet" onPress={demo} disabled={busy} />
     <Pressable accessibilityRole="button" onPress={() => setHelp(!help)}><Text style={s.small}>{help ? 'Hide connection help' : 'Connection help'}</Text></Pressable>
-    {help && <Text style={s.small}>Create a key in Immich → Account Settings → API Keys. Use your laptop’s Wi-Fi address. Required permissions: user.read, asset.read, asset.view, asset.download, asset.update, asset.delete, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, person.read, person.update.</Text>}
+    {help && <Text style={s.small}>Create a key in Immich → Account Settings → API Keys. Use your laptop’s Wi-Fi address. Required permissions: user.read, asset.read, asset.view, asset.download, asset.update, asset.delete, asset.statistics, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, person.read, person.update.</Text>}
   </ScrollView></SafeAreaView>;
 
   return <SafeAreaView style={s.screen}>

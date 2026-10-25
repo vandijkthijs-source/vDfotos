@@ -1,6 +1,11 @@
 import type { Connection } from '../features/sorting/types';
 export type Measurement = { files: number; bytes: number; measuredAt: number };
-export type BackupStatus = { primary: Measurement | null; backup: Measurement | null; checkedAt: number };
+export type BackupStatus = {
+  primary: Measurement | null;
+  backup: Measurement | null;
+  library: { active: number | null; trashed: number | null };
+  checkedAt: number;
+};
 export function validMeasurement(value: unknown): value is Measurement {
   if (!value || typeof value !== 'object') return false;
   const m = value as Measurement;
@@ -18,5 +23,11 @@ export async function fetchBackupStatus(connection: Connection, signal: AbortSig
   if (!response.ok) throw new Error('Backup status unavailable');
   const result = await response.json();
   if (!result || !('primary' in result) || !('backup' in result)) throw new Error('Invalid status');
-  return { primary: validMeasurement(result.primary) ? result.primary : null, backup: validMeasurement(result.backup) ? result.backup : null, checkedAt: Date.now() };
+  const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  return {
+    primary: validMeasurement(result.primary) ? result.primary : null,
+    backup: validMeasurement(result.backup) ? result.backup : null,
+    library: { active: count(result.library?.active), trashed: count(result.library?.trashed) },
+    checkedAt: Date.now(),
+  };
 }

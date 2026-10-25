@@ -13,6 +13,20 @@ DB = Path(os.environ.get('SORT_DB', str(Path(__file__).with_name('progress.sqlit
 IMMICH = os.environ.get('IMMICH_URL', 'http://127.0.0.1:2283').rstrip('/')
 MAX_BODY = 16 * 1024 * 1024
 
+
+def immich_asset_count(key, trashed):
+    """Return the authenticated account's active or trashed asset total."""
+    url = f'{IMMICH}/api/assets/statistics?isTrashed={str(trashed).lower()}'
+    req = urllib.request.Request(url, headers={'x-api-key': key})
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as response:
+            value = json.load(response)
+        total = value.get('total')
+        return total if type(total) is int and total >= 0 else None
+    except Exception:
+        # Keep filesystem status available if the API key lacks statistics access.
+        return None
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
@@ -88,7 +102,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(401, {'error': 'Immich authentication failed'})
             except Exception:
                 return self.reply(503, {'error': 'Cannot verify account'})
-            return self.reply(200, backup_status())
+            status = backup_status()
+            status['library'] = {
+                'active': immich_asset_count(key, False),
+                'trashed': immich_asset_count(key, True),
+            }
+            return self.reply(200, status)
         self.reply(200 if self.path == '/health' else 404, {'service': 'immich-sort-sync', 'version': 1})
 
     def do_POST(self):

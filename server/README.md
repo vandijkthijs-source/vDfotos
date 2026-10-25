@@ -31,7 +31,9 @@ backup has not been configured by this change.
 
 `GET /backup-status` verifies the caller with Immich using the same API key as
 progress sync. It returns aggregate original-media counts and bytes across all
-accounts, not filenames. `backup_status.py` scans `upload/` and `library/` beneath
+accounts, not filenames, and the authenticated account's active and trashed asset
+totals from Immich. The API key needs `asset.statistics` for those two totals.
+`backup_status.py` scans `upload/` and `library/` beneath
 `PHOTO_LIBRARY_ROOT` (default `/home/thijs/immich-library`), excluding generated
 media and sidecars. Measurements are cached for 60 seconds. The app polls every
 30 seconds while foregrounded and marks measurements older than two minutes stale.

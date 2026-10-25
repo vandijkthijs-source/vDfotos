@@ -51,7 +51,7 @@ python3 scripts/check-apk.py android/app/build/outputs/apk/release/app-release.a
 
 1. In Immich's website open **Account Settings → API Keys** and create a key
    for this app with these permissions:
-   `user.read`, `asset.read`, `asset.view`, `asset.download`, `asset.update`, `asset.delete`,
+   `user.read`, `asset.read`, `asset.view`, `asset.download`, `asset.update`, `asset.delete`, `asset.statistics`,
    `album.read`, `album.create`, `album.update`, `albumAsset.create`.
 2. Find the server laptop's Wi-Fi IP using `hostname -I`.
 3. In this app enter `http://<laptop-ip>:2283` and paste the API key. Do not use
