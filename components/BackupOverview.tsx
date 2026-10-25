@@ -16,10 +16,16 @@ function Laptop({ title, address, measurement, total, activePhotos, trashedPhoto
     <Text style={[s.small, { textAlign: 'center', fontSize: 10 }]}>{address}</Text>
     <Text style={[styles.total, { color: measurement ? c.text : c.muted }]}>{measurement ? bytes(measurement.bytes) : '—'}</Text>
     <Text style={[s.label, { textAlign: 'center', fontSize: 12 }]}>{`${measurement?.files.toLocaleString() ?? '—'} / ${total?.toLocaleString() ?? '—'} files`}</Text>
-    {activePhotos !== undefined && <Text style={styles.libraryCount}>{activePhotos?.toLocaleString() ?? '—'} active photos</Text>}
-    {trashedPhotos !== undefined && <Text style={styles.libraryCount}>{trashedPhotos?.toLocaleString() ?? '—'} in Trash</Text>}
-    {backup && measurement && <Text style={styles.libraryCount}>{measurement.recoverableFiles?.toLocaleString() ?? '—'} files in recovery history</Text>}
-    <Text style={{ color: tint, fontSize: 11, textAlign: 'center', fontWeight: '600' }}>{status}</Text>
+    <View style={styles.metricRows}>
+      {backup ? <>
+        <Text numberOfLines={1} style={styles.libraryCount}>{measurement?.recoverableFiles?.toLocaleString() ?? '—'} recoverable files</Text>
+        <Text numberOfLines={1} style={styles.libraryCount}>30-day history</Text>
+      </> : <>
+        <Text numberOfLines={1} style={styles.libraryCount}>{activePhotos?.toLocaleString() ?? '—'} active photos</Text>
+        <Text numberOfLines={1} style={styles.libraryCount}>{trashedPhotos?.toLocaleString() ?? '—'} in Trash</Text>
+      </>}
+    </View>
+    <Text numberOfLines={1} style={{ color: tint, fontSize: 11, lineHeight: 16, textAlign: 'center', fontWeight: '600' }}>{status}</Text>
     <View accessibilityRole="progressbar" accessibilityLabel={`${title} backup progress`} accessibilityValue={{ min: 0, max: 100, now: Math.round((progress ?? 0) * 100) }} style={styles.track}>
       <View style={{ height: 5, width: `${(progress ?? 0) * 100}%`, backgroundColor: tint, borderRadius: 3 }} />
     </View>
@@ -93,6 +99,7 @@ const styles = StyleSheet.create({
   screen: { width: 72, height: 45, borderWidth: 2, borderRadius: 5, backgroundColor: '#20242a', alignItems: 'center', justifyContent: 'center' },
   base: { width: 88, height: 3, borderRadius: 4, marginTop: -4, marginBottom: 7 },
   total: { fontSize: 23, fontWeight: '700', textAlign: 'center', marginTop: 7 },
-  libraryCount: { color: c.muted, fontSize: 11, textAlign: 'center' },
+  metricRows: { height: 32, justifyContent: 'center' },
+  libraryCount: { color: c.muted, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   track: { height: 5, backgroundColor: c.raised, borderRadius: 3, overflow: 'hidden' },
 });
