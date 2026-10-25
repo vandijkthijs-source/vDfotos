@@ -90,7 +90,16 @@ def parse_measurement(raw):
                 raise ValueError('Invalid measurement')
         if value['measuredAt'] > time.time() * 1000 + 60000:
             raise ValueError('Future measurement')
-        return {key: value[key] for key in ('files', 'bytes', 'measuredAt')}
+        result = {key: value[key] for key in ('files', 'bytes', 'measuredAt')}
+        # The backup laptop can measure files preserved in its 30-day history,
+        # but it cannot know which Immich assets are active or in Trash.
+        for field in ('recoverableFiles', 'recoverableBytes'):
+            if field in value:
+                item = value[field]
+                if type(item) not in (int, float) or not 0 <= item < 1e16:
+                    raise ValueError('Invalid recovery measurement')
+                result[field] = item
+        return result
     except (OSError, ValueError, TypeError):
         return None
 

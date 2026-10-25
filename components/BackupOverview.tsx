@@ -6,7 +6,7 @@ import { bytes, fetchBackupStatus, isFresh, type BackupStatus, type Measurement 
 import { Icon, s } from './ui';
 
 const green = '#8bd6b0', amber = '#e4bc76', red = '#ef8585';
-function Laptop({ title, address, measurement, total, activePhotos, trashedPhotos, tint, status, progress, backup = false }: { title: string; address: string; measurement: Measurement | null; total: number | null; activePhotos: number | null; trashedPhotos: number | null; tint: string; status: string; progress: number | null; backup?: boolean }) {
+function Laptop({ title, address, measurement, total, activePhotos, trashedPhotos, tint, status, progress, backup = false }: { title: string; address: string; measurement: Measurement | null; total: number | null; activePhotos?: number | null; trashedPhotos?: number | null; tint: string; status: string; progress: number | null; backup?: boolean }) {
   return <View style={styles.device}>
     <View style={{ alignItems: 'center', gap: 6 }}>
       <View style={[styles.screen, { borderColor: tint }]}><Icon name={backup ? 'shield-checkmark-outline' : 'images-outline'} color={tint} size={24} /></View>
@@ -16,8 +16,9 @@ function Laptop({ title, address, measurement, total, activePhotos, trashedPhoto
     <Text style={[s.small, { textAlign: 'center', fontSize: 10 }]}>{address}</Text>
     <Text style={[styles.total, { color: measurement ? c.text : c.muted }]}>{measurement ? bytes(measurement.bytes) : '—'}</Text>
     <Text style={[s.label, { textAlign: 'center', fontSize: 12 }]}>{`${measurement?.files.toLocaleString() ?? '—'} / ${total?.toLocaleString() ?? '—'} files`}</Text>
-    <Text style={styles.libraryCount}>{activePhotos?.toLocaleString() ?? '—'} active photos</Text>
-    <Text style={styles.libraryCount}>{trashedPhotos?.toLocaleString() ?? '—'} in Trash</Text>
+    {activePhotos !== undefined && <Text style={styles.libraryCount}>{activePhotos?.toLocaleString() ?? '—'} active photos</Text>}
+    {trashedPhotos !== undefined && <Text style={styles.libraryCount}>{trashedPhotos?.toLocaleString() ?? '—'} in Trash</Text>}
+    {backup && measurement && <Text style={styles.libraryCount}>{measurement.recoverableFiles?.toLocaleString() ?? '—'} files in recovery history</Text>}
     <Text style={{ color: tint, fontSize: 11, textAlign: 'center', fontWeight: '600' }}>{status}</Text>
     <View accessibilityRole="progressbar" accessibilityLabel={`${title} backup progress`} accessibilityValue={{ min: 0, max: 100, now: Math.round((progress ?? 0) * 100) }} style={styles.track}>
       <View style={{ height: 5, width: `${(progress ?? 0) * 100}%`, backgroundColor: tint, borderRadius: 3 }} />
@@ -82,7 +83,7 @@ export function BackupOverview({ connection, refreshKey = 0 }: { connection: Con
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <Laptop title="Server laptop" address={new URL(connection.url).hostname} measurement={primary} total={primary?.files ?? null} activePhotos={status?.library.active ?? null} trashedPhotos={status?.library.trashed ?? null} tint={serverTint} status={serverState} progress={serverProgress} />
       <Icon name="arrow-forward-outline" size={18} color={c.muted} />
-      <Laptop title="Backup laptop" address="192.168.68.117" measurement={backup} total={primary?.files ?? null} activePhotos={status?.library.active ?? null} trashedPhotos={status?.library.trashed ?? null} tint={backupTint} status={backupState} progress={backupProgress} backup />
+      <Laptop title="Backup laptop" address="192.168.68.117" measurement={backup} total={primary?.files ?? null} tint={backupTint} status={backupState} progress={backupProgress} backup />
     </View>
   </View>;
 }

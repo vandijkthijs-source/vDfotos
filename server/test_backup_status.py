@@ -50,6 +50,10 @@ class EndpointTests(unittest.TestCase):
         request = Request()
         with patch.object(sync_server.urllib.request, 'build_opener', return_value=Auth()), patch.object(sync_server, 'backup_status', return_value={'primary': None, 'backup': None}):
             sync_server.Handler.do_GET(request)
-        self.assertEqual(request.result, (200, {'primary': None, 'backup': None}))
+        self.assertEqual(request.result, (200, {
+            'primary': None,
+            'backup': None,
+            'library': {'active': None, 'trashed': None},
+        }))
 
 if __name__ == '__main__': unittest.main()

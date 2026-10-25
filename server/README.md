@@ -43,14 +43,23 @@ then turns it red; the server bar is measured independently.
 
 For the second laptop it uses the dedicated `~/.ssh/immich_monitor` key with
 strict host-key checking and batch mode, requesting `photo-status` from
-`thijs@192.168.68.117`. The backup laptop must restrict that key to its installed
-read-only `monitor-status.py` command. Its mirror root is
-`/home/thijs/Immich-Backup/mirror/`. A missing login or failed scan produces an
-unavailable status, retaining the original timestamp of any prior measurement.
-`PHOTO_MONITOR_KEY` overrides the key location. An optional local JSON snapshot
-at `PHOTO_BACKUP_STATUS` (default `server/data/backup-status.json`) can supply
-`files`, `bytes`, and `measuredAt` (Unix milliseconds). Never refresh the snapshot
-timestamp unless the backup has actually been measured.
+`thijs@192.168.68.117`. The backup laptop restricts that key to its installed
+read-only `monitor-status.py` command. It measures the mirror under
+`/home/thijs/Immich-Backup/mirror/` and counts original-media versions in the
+30-day history separately. Its history count excludes the initial hard-linked
+baseline. The backup cannot identify active or trashed Immich assets, so those
+account-specific counts appear only on the server laptop card. A missing login
+or failed scan produces an unavailable status, retaining the original timestamp
+of any prior measurement. `PHOTO_MONITOR_KEY` overrides the key location. An
+optional local JSON snapshot at `PHOTO_BACKUP_STATUS` (default
+`server/data/backup-status.json`) can supply `files`, `bytes`, and `measuredAt`
+(Unix milliseconds). Never refresh the snapshot timestamp unless the backup has
+actually been measured.
 
-The dashboard does not configure backup jobs, verify matching content, or claim
-that 15-minute sync and 30-day recovery are active. These remain setup work.
+The backup laptop pulls originals every 15 minutes using a dedicated SSH key
+restricted to read-only rsync access to `/home/thijs/immich-library`. Changed or
+deleted mirror files are retained under `/home/thijs/Immich-Backup/history/` for
+30 days. The existing mirror was hard-linked as the initial recovery baseline
+before the first catch-up sync. The user timer requires lingering to remain
+active after logout; enable it with `sudo loginctl enable-linger thijs` on the
+backup laptop.

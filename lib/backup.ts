@@ -1,5 +1,5 @@
 import type { Connection } from '../features/sorting/types';
-export type Measurement = { files: number; bytes: number; measuredAt: number };
+export type Measurement = { files: number; bytes: number; measuredAt: number; recoverableFiles?: number; recoverableBytes?: number };
 export type BackupStatus = {
   primary: Measurement | null;
   backup: Measurement | null;
@@ -10,7 +10,10 @@ export type BackupStatus = {
 export function validMeasurement(value: unknown): value is Measurement {
   if (!value || typeof value !== 'object') return false;
   const m = value as Measurement;
-  return [m.files, m.bytes, m.measuredAt].every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0) && m.measuredAt <= Date.now() + 60000;
+  return [m.files, m.bytes, m.measuredAt].every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0)
+    && (m.recoverableFiles === undefined || Number.isSafeInteger(m.recoverableFiles) && m.recoverableFiles >= 0)
+    && (m.recoverableBytes === undefined || Number.isSafeInteger(m.recoverableBytes) && m.recoverableBytes >= 0)
+    && m.measuredAt <= Date.now() + 60000;
 }
 export function isFresh(m: Measurement | null, now: number) { return !!m && now - m.measuredAt < 120000; }
 export function bytes(n: number) {
