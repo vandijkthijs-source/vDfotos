@@ -16,8 +16,8 @@ export function Button({ title, onPress, icon, tone = 'primary', disabled, busy 
     <Text style={[s.buttonText, { color: ink }]}>{title}</Text>
   </Pressable>;
 }
-export function IconButton({ name, label, onPress, disabled }: { name: IconName; label: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[s.iconButton, { opacity: disabled ? .35 : 1 }]}><Icon name={name} /></Pressable>;
+export function IconButton({ name, label, onPress, disabled, active = false }: { name: IconName; label: string; onPress: () => void; disabled?: boolean; active?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active, disabled }} disabled={disabled} onPress={onPress} style={[s.iconButton, active && s.iconButtonActive, { opacity: disabled ? .35 : 1 }]}><Icon name={name} /></Pressable>;
 }
 export function Field(props: ComponentProps<typeof TextInput> & { label: string }) {
   return <View style={{ gap: 8 }}><Text style={s.label}>{props.label}</Text><TextInput {...props} placeholderTextColor={c.muted} style={[s.input, props.style]} /></View>;
@@ -40,6 +40,7 @@ export const s = StyleSheet.create({
   button: { minHeight: 52, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 14, fontWeight: '700' },
   iconButton: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: c.panel },
+  iconButtonActive: { backgroundColor: c.raised, borderWidth: 1, borderColor: c.text },
   input: { backgroundColor: c.panel, borderWidth: 1, borderColor: c.border, color: c.text, minHeight: 54, borderRadius: 10, paddingHorizontal: 16, fontSize: 15 },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderWidth: 1, borderColor: c.border, borderRadius: 10 },
   divider: { height: 1, backgroundColor: c.border },
