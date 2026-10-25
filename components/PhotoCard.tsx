@@ -1,24 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Asset, Connection } from '../features/sorting/types';
 import { captureSwipe } from '../features/sorting/swipe';
 import { ImmichClient } from '../lib/immich';
 import { colors as c } from '../constants/theme';
-import { Button, Icon, IconButton, s } from './ui';
+import { PhotoViewer } from './PhotoViewer';
+import { Button, Icon, s } from './ui';
 
-function Video({ asset, connection }: { asset: Asset; connection: Connection }) {
-  const source = useMemo(() => new ImmichClient(connection).media(asset, true), [asset, connection]);
-  const [error, setError] = useState(false);
-  const player = useVideoPlayer(source, p => { p.loop = false; });
-  return <View style={{ flex: 1 }}>
-    <VideoView player={player} style={{ flex: 1 }} nativeControls contentFit="contain" allowsFullscreen onFirstFrameRender={() => setError(false)} />
-    <Button title="Playback help" tone="quiet" onPress={() => setError(true)} />
-    {error && <Text style={[s.body, { padding: 16 }]}>If playback fails, check the server connection and asset.view / asset.download permissions. You can skip this video and try again later.</Text>}
-  </View>;
-}
 function DemoArtwork({ asset }: { asset: Asset }) {
   return <View style={[StyleSheet.absoluteFill, { backgroundColor: asset.demoColor, overflow: 'hidden', justifyContent: 'flex-end', padding: 24 }]}>
     <View style={{ position: 'absolute', width: 140, height: 140, borderRadius: 100, backgroundColor: '#efd8a0', opacity: .8, top: 48, right: 30 }} />
@@ -28,11 +17,11 @@ function DemoArtwork({ asset }: { asset: Asset }) {
     <Text style={{ color: '#fff', fontSize: 32, fontWeight: '600', maxWidth: 240 }}>{asset.originalFileName}</Text>
   </View>;
 }
-export function PhotoCard({ asset, connection, onDecision, onAlbum, disabled, fill = false }: { asset: Asset; connection: Connection; onDecision: (kind: 'keep' | 'trash') => void; onAlbum?: () => void; disabled?: boolean; fill?: boolean }) {
+export function PhotoCard({ asset, assets = [asset], connection, onDecision, onAlbum, disabled, fill = false }: { asset: Asset; assets?: Asset[]; connection: Connection; onDecision: (kind: 'keep' | 'trash') => void; onAlbum?: () => void; disabled?: boolean; fill?: boolean }) {
   const { width, height } = useWindowDimensions();
   const position = useRef(new Animated.ValueXY()).current;
   const locking = useRef(false);
-  const [viewing, setViewing] = useState(false), [zoom, setZoom] = useState(false), [failed, setFailed] = useState(false), [retry, setRetry] = useState(0);
+  const [viewing, setViewing] = useState(false), [failed, setFailed] = useState(false), [retry, setRetry] = useState(0);
   const responder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) => !disabled && ((Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4) || (!!onAlbum && g.dy < -12 && -g.dy > Math.abs(g.dx) * 1.4)),
     onPanResponderMove: (_, g) => { if (!locking.current) position.setValue({ x: g.dx, y: onAlbum && -g.dy > Math.abs(g.dx) * 1.4 ? g.dy : g.dy * .12 }); },
@@ -66,13 +55,6 @@ export function PhotoCard({ asset, connection, onDecision, onAlbum, disabled, fi
       <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 80, right: 24, borderColor: c.accent, borderWidth: 3, borderRadius: 9, padding: 12, opacity: position.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' }) }}><Text style={[s.heading, { color: c.accent }]}>KEEP</Text></Animated.View>
       <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 80, left: 24, borderColor: c.danger, borderWidth: 3, borderRadius: 9, padding: 12, opacity: position.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' }) }}><Text style={[s.heading, { color: c.danger }]}>DELETE</Text></Animated.View>
     </Animated.View>
-    <Modal visible={viewing} onRequestClose={() => { setViewing(false); setZoom(false); }} animationType="fade">
-      <SafeAreaView style={s.screen}><View style={{ padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={[s.label, { flex: 1 }]} numberOfLines={1}>{asset.originalFileName}</Text><IconButton label="Close photo" name="close" onPress={() => { setViewing(false); setZoom(false); }} /></View>
-        {viewing && asset.type === 'VIDEO' && !connection.demo ? <Video asset={asset} connection={connection} /> : <ScrollView style={{ flex: 1 }} contentContainerStyle={{ width: zoom ? width * 2 : width, height: zoom ? height * 1.6 : height * .7 }} horizontal={zoom}>
-          <Pressable accessibilityLabel="Toggle photo zoom" onPress={() => setZoom(z => !z)} style={{ flex: 1 }}>{photo()}</Pressable>
-        </ScrollView>}
-        <Text style={[s.small, { textAlign: 'center', padding: 16 }]}>Tap the photo to toggle zoom. Close to continue sorting.</Text>
-      </SafeAreaView>
-    </Modal>
+    {viewing && <PhotoViewer asset={asset} assets={assets} connection={connection} onClose={() => setViewing(false)} showActions={false} />}
   </>;
 }

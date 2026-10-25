@@ -85,9 +85,9 @@ function ZoomPhoto({ asset, connection, onNavigate }: { asset: Asset; connection
   </View>;
 }
 
-export function PhotoViewer({ asset: initialAsset, assets, connection, onClose, onLoadMore, hasMore = false, loading = false, onChange }: {
+export function PhotoViewer({ asset: initialAsset, assets, connection, onClose, onLoadMore, hasMore = false, loading = false, onChange, showActions = true }: {
   asset: Asset; assets?: Asset[]; connection: Connection; onClose: () => void;
-  onChange?: (asset: Asset) => void; onLoadMore?: () => void; hasMore?: boolean; loading?: boolean;
+  onChange?: (asset: Asset) => void; onLoadMore?: () => void; hasMore?: boolean; loading?: boolean; showActions?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const [actionBusy, setActionBusy] = useState(false);
@@ -132,10 +132,10 @@ export function PhotoViewer({ asset: initialAsset, assets, connection, onClose, 
         <Pressable accessibilityRole="button" accessibilityLabel="Next photo" disabled={actionBusy || (index >= list.length - 1 && !hasMore)} onPress={() => navigate(1)} style={{ padding: 12, opacity: index >= list.length - 1 && !hasMore ? .3 : 1 }}><Icon name="chevron-forward" color="#fff" /></Pressable>
       </View>}
       </View>
-      <PhotoActions key={asset.id} compact assets={[asset]} connection={connection} onBusyChange={setActionBusy} onClose={() => {}} onChange={updated => {
+      {showActions && <PhotoActions key={asset.id} compact assets={[asset]} connection={connection} onBusyChange={setActionBusy} onClose={() => {}} onChange={updated => {
         setOverrides(old => ({ ...old, [updated.id]: updated })); onChange?.(updated);
         if (updated.isTrashed) onClose();
-      }} />
+      }} />}
     </View>
   </Modal>;
 }

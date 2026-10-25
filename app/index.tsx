@@ -183,6 +183,43 @@ export default function Home() {
       await saveConnection(value); setConnection(value); setKey(''); setPage('photos');
     } catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
+  async function changeServerAddress() {
+    if (!connection || connection.demo || busy) return;
+    setError(''); setBusy(true);
+    try {
+      const normalized = normalizeUrl(url);
+      if (normalized === connection.url) return;
+      const draft: Connection = { ...connection, url: normalized };
+      const client = new ImmichClient(draft);
+      const [user, version] = await Promise.all([client.me(), client.request<{ major: number; minor: number }>('/server/version')]);
+      if (user.id !== connection.userId) throw new Error('That address reached a different Immich account. Nothing was changed.');
+      if (version.major !== 3 || version.minor < 3) throw new Error('This app requires Immich 3.3 or later in the v3 series.');
+      await client.albums();
+      const value = { ...draft, userId: user.id, name: user.name };
+      const oldAccount = `${connection.url}|${connection.userId}`;
+      const newAccount = `${value.url}|${value.userId}`;
+      const previousProgress = useSortStore.getState().accounts[oldAccount];
+      if (previousProgress) {
+        useSortStore.setState(state => {
+          const existing = state.accounts[newAccount];
+          const merged = existing ? {
+            ...previousProgress,
+            ...existing,
+            pending: { ...previousProgress.pending, ...existing.pending },
+            completed: { ...previousProgress.completed, ...existing.completed },
+            resetWeeks: { ...previousProgress.resetWeeks, ...existing.resetWeeks },
+            manualWeeks: { ...previousProgress.manualWeeks, ...existing.manualWeeks },
+            sortedWeeks: { ...previousProgress.sortedWeeks, ...existing.sortedWeeks },
+            selectedAlbum: existing.selectedAlbum ?? previousProgress.selectedAlbum,
+          } : previousProgress;
+          return { accounts: { ...state.accounts, [newAccount]: merged } };
+        });
+      }
+      await saveConnection(value);
+      setConnection(value); setUrl(value.url); setPage('photos');
+    } catch (e) { setError(message(e)); }
+    finally { setBusy(false); }
+  }
   function demo() {
     setError(''); setWeek(monday()); setPeriodMode('weeks');
     setConnection({ url: 'demo://immich-sort', key: '', name: 'Thijs', userId: 'demo', demo: true }); setPage('photos');
@@ -241,14 +278,24 @@ export default function Home() {
   return <SafeAreaView style={s.screen}>
     <View style={[s.spread, { maxWidth: 540, width: '100%', alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back to weeks" disabled={busy} onPress={() => { setPage('weeks'); setError(''); }} style={s.row}><Text style={[s.label, { fontSize: 18 }]}>vDfotos</Text></Pressable>
-      <View style={s.row}>{connection.demo && <Text style={[s.eyebrow, { fontSize: 10 }]}>DEMO</Text>}<IconButton name="laptop-outline" label="Backup" active={page === 'backup'} disabled={busy} onPress={() => { setPage('backup'); setError(''); }} /><IconButton name={page === 'albums' ? 'add' : 'settings-outline'} label={page === 'albums' ? 'Create album' : 'Settings'} active={page === 'settings'} disabled={busy} onPress={() => { if (page === 'albums') setCreateAlbumRequest(n => n + 1); else { setPage('settings'); setError(''); } }} /></View>
+      <View style={s.row}>{connection.demo && <Text style={[s.eyebrow, { fontSize: 10 }]}>DEMO</Text>}<IconButton name="laptop-outline" label="Backup" active={page === 'backup'} disabled={busy} onPress={() => { setPage('backup'); setError(''); }} /><IconButton name={page === 'albums' ? 'add' : 'settings-outline'} label={page === 'albums' ? 'Create album' : 'Settings'} active={page === 'settings'} disabled={busy} onPress={() => { if (page === 'albums') setCreateAlbumRequest(n => n + 1); else { setPage('settings'); setUrl(connection.url); setError(''); } }} /></View>
     </View>
     {page === 'photos' || page === 'albums' || page === 'search' ? <Library key={`${account}|${page}`} mode={page} connection={connection} createAlbumRequest={createAlbumRequest} /> : <ScrollView ref={mainScroll} scrollEnabled={page !== 'sort'} bounces={page !== 'sort'} overScrollMode={page === 'sort' ? 'never' : 'auto'} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, { paddingTop: 16, gap: 18 }, page === 'sort' && { flex: 1, gap: 10, paddingTop: 6, paddingBottom: 12 }]} >
       {page === 'backup' && <BackupOverview connection={connection} />}
       {page === 'settings' ? <>
         <Button title="Back to photos" tone="quiet" icon="arrow-back" onPress={() => { setPage('photos'); setError(''); }} />
         <Text style={s.heading}>Settings</Text>
-        {!connection.demo && <><Text style={s.body}>{syncState || 'Waiting to sync'}</Text><Button title="Sync progress now" tone="quiet" icon="sync-outline" onPress={() => setSyncTick(n => n + 1)} /></>}
+        {error ? <Notice error>{error}</Notice> : null}
+        {!connection.demo && <>
+          <Text style={s.body}>{syncState || 'Waiting to sync'}</Text>
+          <Button title="Sync progress now" tone="quiet" icon="sync-outline" onPress={() => setSyncTick(n => n + 1)} />
+          <View style={s.panel}>
+            <Text style={s.label}>Immich server address</Text>
+            <Text style={s.small}>For access away from home, use the server laptop’s Tailscale IP with port 2283.</Text>
+            <Field label="" placeholder="http://100.118.124.29:2283" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
+            <Button title="Update server address" tone="quiet" icon="sync-outline" onPress={() => void changeServerAddress()} busy={busy} disabled={busy || url.trim() === connection.url} />
+          </View>
+        </>}
         <View style={s.panel}><Text style={s.heading}>{connection.name}</Text><Text style={s.body}>{connection.demo ? 'Sample library · no real photos' : connection.url}</Text><Text style={s.small}>Completed progress syncs with this Immich server across devices. Pending swipe decisions stay on this device. Disconnecting preserves local progress.</Text></View>
         <Notice>Only photos owned by this account and visible in its timeline are loaded. Archived, locked and trashed items are excluded.</Notice>
         <Notice>Delete decisions affect the Immich copy. This app does not access or remove files from your phone’s gallery. Items in Immich Trash will expire according to your server’s retention settings.</Notice>
@@ -281,7 +328,7 @@ export default function Home() {
         {loading ? <ActivityIndicator color={c.accent} /> : <>
           <View style={s.spread}><Text style={s.heading}>{remaining.length ? `${remaining.length} moments left` : weekPending.length ? 'Ready to apply' : `${periodNoun === 'week' ? 'Week' : 'Month'} complete`}</Text><View style={s.row}><Text style={s.small}>{assets.length - remaining.length} / {assets.length}</Text><IconButton name="arrow-undo-outline" label="Undo last decision" disabled={!latest || busy} onPress={() => latest && undo(account, latest.asset.id)} /></View></View>
           {remaining[0] ? <>
-            <PhotoCard fill key={remaining[0].id} asset={remaining[0]} connection={connection} onDecision={decide} onAlbum={() => { if (!busy && !loading && !picker) { pendingKeep.current = remaining[0]; setPicker(true); } }} disabled={busy || picker} />
+            <PhotoCard fill key={remaining[0].id} asset={remaining[0]} assets={remaining} connection={connection} onDecision={decide} onAlbum={() => { if (!busy && !loading && !picker) { pendingKeep.current = remaining[0]; setPicker(true); } }} disabled={busy || picker} />
           </> : <View style={[s.panel, { alignItems: 'center', padding: 32 }]}><Icon name="checkmark-circle-outline" size={56} color={c.accent} /><Text style={s.heading}>{weekPending.length ? 'Ready to apply' : assets.length ? `${periodNoun === 'week' ? 'Week' : 'Month'} sorted` : `No photos this ${periodNoun}`}</Text><Text style={[s.body, { textAlign: 'center' }]}>{weekPending.length ? 'Apply your decisions to save them to Immich.' : `Everything loaded for this ${periodNoun} is sorted. Refresh later for newly uploaded photos.`}</Text></View>}
           {!remaining.length && !weekPending.length && assets.length > 0 && !error && <Button title="Sort further" tone="quiet" icon="refresh-outline" onPress={() => { setReviewAgain(true); setReviewedAgain([]); setStatus(`Reviewing this ${periodNoun} again. Saved changes stay in Immich until you apply new decisions.`); }} />}
           {!remaining.length && !weekPending.length && applyRemaining === null && !error ?
