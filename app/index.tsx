@@ -246,7 +246,7 @@ export default function Home() {
     {page === 'photos' || page === 'albums' || page === 'search' ? <Library key={`${account}|${page}`} mode={page} connection={connection} createAlbumRequest={createAlbumRequest} /> : <ScrollView ref={mainScroll} scrollEnabled={page !== 'sort'} bounces={page !== 'sort'} overScrollMode={page === 'sort' ? 'never' : 'auto'} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, { paddingTop: 16, gap: 18 }, page === 'sort' && { flex: 1, gap: 10, paddingTop: 6, paddingBottom: 12 }]} >
       {page === 'backup' && <BackupOverview connection={connection} />}
       {page === 'settings' ? <>
-        <Button title="Back to weeks" tone="quiet" icon="arrow-back" onPress={() => { setPage('weeks'); setError(''); }} />
+        <Button title="Back to photos" tone="quiet" icon="arrow-back" onPress={() => { setPage('photos'); setError(''); }} />
         <Text style={s.heading}>Settings</Text>
         {!connection.demo && <><Text style={s.body}>{syncState || 'Waiting to sync'}</Text><Button title="Sync progress now" tone="quiet" icon="sync-outline" onPress={() => setSyncTick(n => n + 1)} /></>}
         <View style={s.panel}><Text style={s.heading}>{connection.name}</Text><Text style={s.body}>{connection.demo ? 'Sample library · no real photos' : connection.url}</Text><Text style={s.small}>Completed progress syncs with this Immich server across devices. Pending swipe decisions stay on this device. Disconnecting preserves local progress.</Text></View>
