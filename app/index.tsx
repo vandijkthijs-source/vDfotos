@@ -3,13 +3,14 @@ import { useImagePreload } from '../lib/imagePreload';
 import { assetWeek, monthStart, shiftMonth, periodLabel, periodDecisions, remainingPhotos, monthSummary, type SortPeriod } from '../features/sorting/period';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors as c } from '../constants/theme';
 import { Button, Field, Icon, IconButton, Notice, s } from '../components/ui';
 import { Library } from '../components/Library';
 import { PhotoCard } from '../components/PhotoCard';
 import type { Album, Asset, Connection } from '../features/sorting/types';
-import { monday, shiftWeek } from '../features/sorting/week';
+import { monday, shiftWeek, weekBounds } from '../features/sorting/week';
 import { demoAlbums, demoAssets, demoMonth } from '../features/sorting/demo';
 import { isReviewed, isWeekSorted, weeksToRecheck } from '../features/sorting/progress';
 import { commitDecisions } from '../features/sorting/commit';
@@ -20,6 +21,8 @@ import { useSortStore } from '../store/useSortStore';
 
 const message = (e: unknown) => e instanceof Error ? e.message : 'Something went wrong. Please try again.';
 type Page = 'backup' | 'photos' | 'albums' | 'search' | 'weeks' | 'sort' | 'settings';
+const EMPTY_MONTH_SUMMARIES: Record<string, { reviewed: number; total: number; sorted: boolean; checkedAt: number }> = {};
+const MONTH_SUMMARY_CACHE_TTL = 5 * 60 * 1000;
 
 export default function Home() {
   const [connection, setConnection] = useState<Connection | null>(null);
@@ -31,6 +34,7 @@ export default function Home() {
   const [periodMode, setPeriodMode] = useState<SortPeriod>('weeks');
   const [monthCount, setMonthCount] = useState(12);
   const [monthPhotos, setMonthPhotos] = useState<Record<string, Asset[]>>({});
+  const [periodCovers, setPeriodCovers] = useState<Record<string, Asset>>({});
   const [assets, setAssets] = useState<Asset[]>([]), [albums, setAlbums] = useState<Album[]>([]);
   const [picker, setPicker] = useState(false), [newAlbum, setNewAlbum] = useState('');
   const [applyRemaining, setApplyRemaining] = useState<number | null>(null);
@@ -57,10 +61,32 @@ export default function Home() {
   const mainScroll = useRef<ScrollView>(null);
   const account = connection ? `${connection.url}|${connection.userId}` : '';
   const progress = useSortStore(state => state.accounts[account]);
+  const monthSummaries = useSortStore(state => state.monthSummaries[account] ?? EMPTY_MONTH_SUMMARIES);
+  const cacheMonthSummary = useSortStore(state => state.cacheMonthSummary);
   const stage = useSortStore(state => state.stage), undo = useSortStore(state => state.undo);
   const complete = useSortStore(state => state.complete), selectAlbum = useSortStore(state => state.selectAlbum);
   const api = useMemo(() => connection && !connection.demo ? new ImmichClient(connection) : null, [connection]);
   const weekPending = useMemo(() => periodDecisions(progress, week, periodMode), [progress, week, periodMode]);
+  useEffect(() => {
+    if (!unsortedOnly || page !== 'weeks' || !periods.length) return;
+    const allSorted = periods.every(value => {
+      const pending = periodDecisions(progress, value, periodMode).length > 0;
+      if (pending) return false;
+      if (periodMode === 'weeks') return !!progress?.sortedWeeks?.[value];
+      const photos = monthPhotos[value];
+      if (photos) {
+        const summary = monthSummary(progress, value, photos);
+        return summary.sorted || summary.total === 0;
+      }
+      const cached = monthSummaries[value];
+      if (!cached) return false;
+      return cached.total === 0 || cached.reviewed === cached.total;
+    });
+    if (allSorted) {
+      if (periodMode === 'weeks') setWeekCount(count => count + 52);
+      else setMonthCount(count => count + 12);
+    }
+  }, [monthPhotos, monthSummaries, page, periodMode, periods, progress, unsortedOnly]);
   const allPending = Object.values(progress?.pending ?? {});
   const remaining = remainingPhotos(progress, assets, reviewAgain, reviewedAgain);
   useImagePreload(page === 'sort' ? connection : null, remaining.slice(1, 4));
@@ -110,6 +136,33 @@ export default function Home() {
   }, [account, api, connection, hydrated, markWeek, page, syncRevision, periodMode]);
 
   useEffect(() => { setMonthPhotos({}); }, [account]);
+  useEffect(() => { setPeriodCovers({}); }, [account]);
+  useEffect(() => {
+    if (!connection || !hydrated || page !== 'weeks' || periodMode !== 'weeks' || !weeks.length) return;
+    let valid = true;
+    if (connection.demo) {
+      const samples = weeks.flatMap(value => demoAssets(value).slice(0, 1));
+      setPeriodCovers(old => ({ ...old, ...Object.fromEntries(samples.map(asset => [`weeks:${assetWeek(asset)}`, asset])) }));
+      return () => { valid = false; };
+    }
+    const { start } = weekBounds(weeks[weeks.length - 1]);
+    const { end } = weekBounds(weeks[0]);
+    void api!.randomInRange(start, end, Math.min(1000, weeks.length * 8)).then(samples => {
+      if (!valid) return;
+      const counts: Record<string, number> = {};
+      const covers: Record<string, Asset> = {};
+      for (const asset of samples) {
+        if (asset.ownerId !== connection.userId || asset.isTrashed || !['IMAGE', 'VIDEO'].includes(asset.type)) continue;
+        const value = assetWeek(asset);
+        if (!weeks.includes(value)) continue;
+        const count = counts[value] ?? 0;
+        counts[value] = count + 1;
+        if (Math.random() < 1 / (count + 1)) covers[`weeks:${value}`] = asset;
+      }
+      setPeriodCovers(old => ({ ...old, ...covers }));
+    }).catch(() => { /* Keep the lightweight placeholder if cover sampling is unavailable. */ });
+    return () => { valid = false; };
+  }, [api, connection, hydrated, page, periodMode, weeks]);
   useEffect(() => {
     if (!connection || !hydrated || page !== 'weeks' || periodMode !== 'months') return;
     const abort = new AbortController();
@@ -117,14 +170,20 @@ export default function Home() {
       for (const value of months) {
         if (abort.signal.aborted) return;
         try {
+          const cached = useSortStore.getState().monthSummaries[account]?.[value];
+          if (!connection.demo && cached && Date.now() - cached.checkedAt < MONTH_SUMMARY_CACHE_TTL) continue;
           const photos = connection.demo ? demoMonth(value) : await api!.month(value, abort.signal);
           if (abort.signal.aborted) return;
           setMonthPhotos(old => ({ ...old, [value]: photos }));
+          const summary = monthSummary(useSortStore.getState().accounts[account], value, photos);
+          const cover = photos.length ? photos[Math.floor(Math.random() * photos.length)] : undefined;
+          cacheMonthSummary(account, value, { reviewed: summary.reviewed, total: summary.total, sorted: summary.sorted, checkedAt: Date.now(), cover });
+          if (cover) setPeriodCovers(old => old[`months:${value}`] ? old : ({ ...old, [`months:${value}`]: cover }));
         } catch (e) { if (!abort.signal.aborted) setError(message(e)); return; }
       }
     })();
     return () => abort.abort();
-  }, [account, api, connection, hydrated, months, page, periodMode, syncRevision]);
+  }, [account, api, cacheMonthSummary, connection, hydrated, months, page, periodMode, syncRevision]);
 
   useEffect(() => {
     if (!connection || connection.demo || !hydrated) return;
@@ -212,7 +271,12 @@ export default function Home() {
             sortedWeeks: { ...previousProgress.sortedWeeks, ...existing.sortedWeeks },
             selectedAlbum: existing.selectedAlbum ?? previousProgress.selectedAlbum,
           } : previousProgress;
-          return { accounts: { ...state.accounts, [newAccount]: merged } };
+          return {
+            accounts: { ...state.accounts, [newAccount]: merged },
+            monthSummaries: state.monthSummaries[newAccount]
+              ? state.monthSummaries
+              : { ...state.monthSummaries, [newAccount]: state.monthSummaries[oldAccount] ?? {} },
+          };
         });
       }
       await saveConnection(value);
@@ -309,11 +373,22 @@ export default function Home() {
         <View>
           {periods.map((value, index) => {
             const pending = periodDecisions(progress, value, periodMode).length;
-            const summary = periodMode === 'months' && monthPhotos[value] ? monthSummary(progress, value, monthPhotos[value]) : null;
-            const sorted = periodMode === 'months' ? !!summary?.sorted : !!progress?.sortedWeeks?.[value] && !pending;
+            const cachedMonth = periodMode === 'months' ? monthSummaries[value] : undefined;
+            const summary = periodMode === 'months'
+              ? monthPhotos[value]
+                ? monthSummary(progress, value, monthPhotos[value])
+                : cachedMonth
+                  ? { ...cachedMonth, pending, sorted: pending === 0 && (cachedMonth.total === 0 || cachedMonth.reviewed === cachedMonth.total) }
+                  : null
+              : null;
+            const sorted = periodMode === 'months' ? !!summary && (summary.sorted || summary.total === 0) : !!progress?.sortedWeeks?.[value] && !pending;
+            const cover = periodCovers[`${periodMode}:${value}`] ?? (periodMode === 'months' ? cachedMonth?.cover : undefined);
             if (unsortedOnly && sorted && !selectedWeeks.includes(value)) return null;
-            return <Pressable key={value} accessibilityRole="button" accessibilityLabel={index === 0 ? `Open current ${periodNoun}` : `Open ${periodLabel(value, periodMode)}`} accessibilityState={{ selected: selectedWeeks.includes(value) }} disabled={busy} onLongPress={periodMode === 'months' ? undefined : () => { setSelectionMode(true); setSelectedWeeks(old => old.includes(value) ? old : [...old, value]); }} delayLongPress={400} onPress={() => selectionMode ? toggleSelection(value) : changeWeek(value)} style={({ pressed }) => [s.spread, { backgroundColor: selectedWeeks.includes(value) ? '#162b45' : 'transparent', paddingHorizontal: selectionMode ? 12 : 0, paddingVertical: 20, borderBottomWidth: 1, borderColor: c.border, opacity: pressed ? .6 : 1 }]}>
+            return <Pressable key={value} accessibilityRole="button" accessibilityLabel={index === 0 ? `Open current ${periodNoun}` : `Open ${periodLabel(value, periodMode)}`} accessibilityState={{ selected: selectedWeeks.includes(value) }} disabled={busy} onLongPress={periodMode === 'months' ? undefined : () => { setSelectionMode(true); setSelectedWeeks(old => old.includes(value) ? old : [...old, value]); }} delayLongPress={400} onPress={() => selectionMode ? toggleSelection(value) : changeWeek(value)} style={({ pressed }) => [s.spread, { backgroundColor: selectedWeeks.includes(value) ? '#162b45' : 'transparent', paddingHorizontal: selectionMode ? 12 : 0, paddingVertical: 12, borderBottomWidth: 1, borderColor: c.border, opacity: pressed ? .6 : 1 }]}>
               {selectionMode && <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: selectedWeeks.includes(value) ? '#529eff' : c.muted, backgroundColor: selectedWeeks.includes(value) ? '#529eff' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{selectedWeeks.includes(value) && <Icon name="checkmark" size={16} color="#fff" />}</View>}
+              <View style={{ width: 58, height: 58, borderRadius: 12, overflow: 'hidden', backgroundColor: cover?.demoColor ?? c.panel, alignItems: 'center', justifyContent: 'center' }}>
+                {cover && connection && !connection.demo ? <Image source={api!.media(cover, false, 'thumbnail')} style={{ width: 58, height: 58 }} contentFit="cover" cachePolicy="memory-disk" /> : cover?.demoColor ? <View style={{ width: '100%', height: '100%', backgroundColor: cover.demoColor, alignItems: 'center', justifyContent: 'center' }}><Icon name="image-outline" size={21} color="#ffffffbb" /></View> : <Icon name="image-outline" size={21} color={c.muted} />}
+              </View>
               <View style={{ flex: 1, gap: 5 }}><Text style={[s.label, { fontSize: 15 }]}>{periodLabel(value, periodMode)}</Text>{(sorted || pending > 0) && <Text style={s.small}>{sorted ? 'Sorted' : `${pending} waiting to apply`}</Text>}{periodMode === 'months' && !sorted && !pending && <Text style={s.small}>{summary ? `${summary.reviewed} / ${summary.total} sorted` : 'Loading progress…'}</Text>}</View>
               <Icon name={sorted ? 'checkmark' : 'chevron-forward'} color={sorted ? c.text : c.muted} size={20} />
             </Pressable>;

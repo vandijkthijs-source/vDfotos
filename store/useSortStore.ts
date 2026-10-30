@@ -4,8 +4,11 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Asset, Decision, Progress } from '../features/sorting/types';
 const empty = (): Progress => ({ pending: {}, completed: {} });
+export type CachedMonthSummary = { reviewed: number; total: number; sorted: boolean; checkedAt: number; cover?: Asset };
 type State = {
   accounts: Record<string, Progress>;
+  monthSummaries: Record<string, Record<string, CachedMonthSummary>>;
+  cacheMonthSummary: (account: string, month: string, summary: CachedMonthSummary) => void;
   mergeRemote: (account: string, remote: Pick<Progress, 'completed' | 'manualWeeks' | 'resetWeeks'>) => void;
   resetWeek: (account: string, week: string) => void;
   markAssetsReviewed: (account: string, assets: Asset[]) => void;
@@ -18,6 +21,10 @@ type State = {
 };
 export const useSortStore = create<State>()(persist((set) => ({
   accounts: {},
+  monthSummaries: {},
+  cacheMonthSummary: (account, month, summary) => set(state => ({
+    monthSummaries: { ...state.monthSummaries, [account]: { ...state.monthSummaries[account], [month]: summary } },
+  })),
   mergeRemote: (account, remote) => set(state => {
     const p = state.accounts[account] ?? empty(), completed = { ...p.completed };
     let changed = false;

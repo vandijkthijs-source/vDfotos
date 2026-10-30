@@ -81,6 +81,16 @@ export class ImmichClient {
   createAlbum(albumName: string) { return this.request<Album>('/albums', 'POST', { albumName }); }
   week(week: string, signal?: AbortSignal) { return this.dateRange(weekBounds(week), signal); }
   month(month: string, signal?: AbortSignal) { return this.dateRange(monthBounds(month), signal); }
+  randomInRange(start: string, end: string, size = 1000) {
+    return this.request<Asset[]>('/search/random', 'POST', {
+      size,
+      filter: {
+        takenAt: { gte: start, lt: end },
+        trashedAt: { eq: null },
+        visibility: { eq: 'timeline' },
+      },
+    });
+  }
   private async dateRange({ start, end }: { start: string; end: string }, signal?: AbortSignal) {
     const assets = new Map<string, Asset>();
     let cursor: string | undefined;

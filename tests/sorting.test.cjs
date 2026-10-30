@@ -44,6 +44,24 @@ test('week fetches every cursor page, removes duplicates and excludes other user
   assert.equal(calls[0].filter.visibility.eq, 'timeline');
   assert.ok(calls[0].filter.takenAt.lt);
 });
+test('period cover sampling asks Immich for random timeline assets within the requested date range', async () => {
+  let request;
+  const api = new ImmichClient(connection, async (url, options) => {
+    request = { url, options };
+    return response([asset('cover')]);
+  });
+  assert.deepEqual(await api.randomInRange('2026-10-19T00:00:00.000Z', '2026-10-26T00:00:00.000Z', 64), [asset('cover')]);
+  assert.equal(request.url, `${connection.url}/api/search/random`);
+  assert.equal(request.options.method, 'POST');
+  assert.deepEqual(JSON.parse(request.options.body), {
+    size: 64,
+    filter: {
+      takenAt: { gte: '2026-10-19T00:00:00.000Z', lt: '2026-10-26T00:00:00.000Z' },
+      trashedAt: { eq: null },
+      visibility: { eq: 'timeline' },
+    },
+  });
+});
 test('repeated cursors fail rather than looping or silently truncating the week', async () => {
   const api = new ImmichClient(connection, async () => response({ assets: { items: [], nextCursor: 'same' } }));
   await assert.rejects(api.week('2026-10-19'), /repeated a page/);
@@ -132,12 +150,15 @@ test('saved progress survives reload, stays account-scoped, and undo never clear
   assert.equal(store.getState().accounts['server-b|user-a'].pending.a.kind, 'trash');
   store.getState().stage('server-a|user-a', d);
   store.getState().complete('server-a|user-a', 'a');
+  store.getState().cacheMonthSummary('server-a|user-a', '2026-10-01', { reviewed: 12, total: 12, sorted: true, checkedAt: 123 });
   assert.equal(store.getState().accounts['server-a|user-a'].pending.a, undefined);
   assert.equal(store.getState().accounts['server-a|user-a'].completed.a.asset, undefined);
   store.getState().markWeek('server-a|user-a', d.week, true);
   await store.persist.rehydrate();
   assert.equal(store.getState().accounts['server-a|user-a'].completed.a.week, '2026-10-19');
   assert.equal(store.getState().accounts['server-a|user-a'].sortedWeeks[d.week], true);
+  assert.equal(store.getState().monthSummaries['server-a|user-a']['2026-10-01'].sorted, true);
+  assert.equal(store.getState().monthSummaries['server-b|user-a'], undefined);
   assert.equal(store.getState().accounts['server-b|user-a'].sortedWeeks, undefined);
   store.getState().markWeek('server-a|user-a', d.week, false);
   assert.equal(store.getState().accounts['server-a|user-a'].sortedWeeks[d.week], false);
