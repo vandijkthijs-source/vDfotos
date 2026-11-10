@@ -116,7 +116,7 @@ def remote_backup():
         result = subprocess.run([
             "ssh", "-i", os.environ.get("PHOTO_MONITOR_KEY", str(Path.home() / ".ssh/immich_monitor")),
             "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=yes",
-            "-o", "ConnectTimeout=4", "thijs@192.168.68.117", "photo-status",
+            "-o", "ConnectTimeout=4", os.environ.get("PHOTO_BACKUP_HOST", "thijs@192.168.68.117"), "photo-status",
         ], capture_output=True, text=True, timeout=12, check=True)
         return parse_measurement(result.stdout)
     except (OSError, subprocess.SubprocessError):

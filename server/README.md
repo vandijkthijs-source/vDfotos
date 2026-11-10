@@ -63,3 +63,33 @@ deleted mirror files are retained under `/home/thijs/Immich-Backup/history/` for
 before the first catch-up sync. The user timer requires lingering to remain
 active after logout; enable it with `sudo loginctl enable-linger thijs` on the
 backup laptop.
+
+
+## Rollenwissel — 10 november 2026
+
+De actieve Immich-server is nu `http://100.118.124.29:2283`, versie 3.3.5
+met dezelfde accounts, database en foto-inhoud. vDfotos-synchronisatie draait daar
+op poort 2284. `PHOTO_BACKUP_HOST=thijs@100.114.241.126` wijst de monitor naar
+de nieuwe mirror; de meetsleutel blijft uitsluitend-lezen.
+
+Deze ontwikkellaptop (`100.114.241.126`) is nu mirror. De bestaande fotomap
+`/home/thijs/immich-library` wordt via `~/Immich-Backup/mirror` gebruikt en
+iedere 15 minuten bijgewerkt wanneer deze laptop beschikbaar is. Verwijderde of
+gewijzigde bestanden blijven 30 dagen in `~/Immich-Backup/history`.
+De SSH-pullsleutel `~/.ssh/immich_mirror_pull` heeft uitsluitend-lezen toegang
+tot de fotomap op de nieuwe server. De oude lokale Immich-containers zijn
+behouden maar gestopt en hebben restart=no. De oude sorteerservice is uitgeschakeld.
+
+De volledige laatste fotokopie is vóór activering inhoudelijk via rsync --checksum
+vergeleken. De database werd geëxporteerd terwijl de oude server gestopt was;
+de doeldump is op SHA-256 en gzip-integriteit gecontroleerd en transactioneel
+hersteld. De sorteervoortgang is via SQLite backup overgezet zonder een bestaande
+doeldatabase te overschrijven. Een consistente voortgangskopie wordt op de nieuwe
+server iedere 15 minuten onder immich-library/backups/vdfotos-progress.sqlite3
+bewaard en gaat mee naar de mirror. Immichs eigen databasebackups blijven actief.
+
+De oude mirror en geschiedenis op de nieuwe server zijn bewaard als extra
+herstelmogelijkheid. Verwijder deze niet voordat herstel en telefoongebruik bevestigd
+zijn. De actieve server blijft wakker bij inactiviteit en dichtklappen; het scherm
+mag uit. Netvoeding en Linger=yes zijn gecontroleerd. Een fysieke herstart/dichtklaptest
+is tijdens deze migratie niet uitgevoerd.
